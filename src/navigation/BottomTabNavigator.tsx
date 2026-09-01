@@ -21,24 +21,24 @@ const HeaderDateCard = ({ isDark, colors }: { isDark: boolean, colors: any }) =>
     backgroundColor: isDark ? '#1F2937' : '#EFF6FF',
     borderColor: colors.border,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
   }}>
-    <View style={{ marginRight: 10 }}>
-      <Text style={{ fontSize: 10, fontWeight: '600', color: isDark ? '#60A5FA' : '#2563EB', textTransform: 'uppercase', marginBottom: 2 }}>
+    <View style={{ marginRight: 6 }}>
+      <Text style={{ fontSize: 8, fontWeight: '600', color: isDark ? '#60A5FA' : '#2563EB', textTransform: 'uppercase', marginBottom: 1 }}>
         {format(new Date(), 'EEEE')}
       </Text>
-      <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.text }}>
+      <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.text }}>
         {format(new Date(), 'MMMM d, yyyy')}
       </Text>
     </View>
     <View style={{ 
-      width: 28, height: 28, borderRadius: 14, 
+      width: 20, height: 20, borderRadius: 10, 
       backgroundColor: isDark ? '#374151' : '#DBEAFE',
       alignItems: 'center', justifyContent: 'center' 
     }}>
-      <Calendar size={14} color={isDark ? '#60A5FA' : '#2563EB'} />
+      <Calendar size={10} color={isDark ? '#60A5FA' : '#2563EB'} />
     </View>
   </View>
 );
@@ -54,7 +54,7 @@ export default function BottomTabNavigator() {
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
         headerLeft: () => (
-          <Text style={{ marginLeft: 16, fontSize: 20, fontWeight: 'bold', color: colors.text }}>
+          <Text style={{ marginLeft: 16, fontSize: 16, fontWeight: 'bold', color: colors.text }}>
             {route.name}
           </Text>
         ),

@@ -23,7 +23,6 @@ const MIME_BY_EXT: Record<string, string> = {
   '3gp': 'audio/3gpp',
   wav: 'audio/wav',
   ogg: 'audio/ogg',
-  awb: 'audio/amr-wb',
 };
 
 function guessMimeType(fileUri: string): string {

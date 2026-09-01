@@ -166,7 +166,7 @@ export const callsApi = {
     form.append('file', { uri: fileUri, name, type: mimeType } as unknown as Blob);
 
     try {
-      await apiClient.post('/calls/recordings', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      await apiClient.post('/calls/recordings', form);
       return true;
     } catch (err: any) {
       if (err?.response?.data?.error?.code === 'NOT_A_LEAD') return false;

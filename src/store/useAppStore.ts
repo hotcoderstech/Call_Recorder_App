@@ -135,9 +135,6 @@ export const useAppStore = create<AppState>()(
       // logged-in session or sync watermark for anyone else.
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<AppState> | undefined;
-        if (version < 1 && state?.apiBaseUrl?.includes('192.168.')) {
-          state.apiBaseUrl = 'https://lms.raylongsolutions.com/api/v1';
-        }
         if (version < 2 && state) {
           state.apiBaseUrl = 'https://lead-management-fam-info-backend-1.onrender.com/api/v1';
         }
