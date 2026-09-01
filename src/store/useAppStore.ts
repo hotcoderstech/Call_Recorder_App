@@ -71,7 +71,7 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      theme: 'system',
+      theme: 'light',
       appLockEnabled: false,
       groupRepeatedCalls: true,
       showDuration: true,
@@ -83,7 +83,7 @@ export const useAppStore = create<AppState>()(
       // Real production backend by default — this ships in the installed APK, so it must work
       // off the shelf, not just for a developer on the same LAN as a dev server. Change it in
       // Settings only for pointing a build at a local/staging backend during development.
-      apiBaseUrl:'http://192.168.1.50:3000/api/v1',
+      apiBaseUrl: 'https://lead-management-fam-info-backend-1.onrender.com/api/v1',
       setApiBaseUrl: (url) => set({ apiBaseUrl: url.trim().replace(/\/+$/, '') }),
 
       accessToken: null,
@@ -127,7 +127,7 @@ export const useAppStore = create<AppState>()(
     {
       name: 'app-preferences',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
       // A local LAN-IP apiBaseUrl briefly leaked into the default (see git history) and, since this
       // whole store persists unfiltered, got baked into AsyncStorage on any device that opened the
       // app during that window — a plain code fix to the default above doesn't undo that. This
@@ -137,6 +137,9 @@ export const useAppStore = create<AppState>()(
         const state = persistedState as Partial<AppState> | undefined;
         if (version < 1 && state?.apiBaseUrl?.includes('192.168.')) {
           state.apiBaseUrl = 'https://lms.raylongsolutions.com/api/v1';
+        }
+        if (version < 2 && state) {
+          state.apiBaseUrl = 'https://lead-management-fam-info-backend-1.onrender.com/api/v1';
         }
         return state as AppState;
       },

@@ -38,10 +38,8 @@ type Candidate = { number: string; type: number; timestamp: number; duration: nu
  * Pushes call-log entries newer than the last successful sync to the backend. Uses the device's
  * own history each time (not local SQLite meta) since the backend only needs number/type/time/duration.
  *
- * Connected calls (duration > 0) are deliberately NOT sent through this metadata-only path — a
- * call log is only allowed into the DB together with proof of the conversation (its recording), so
- * those go exclusively through matchAndUploadRecordings below. Missed/rejected/no-answer calls
- * (duration 0) have nothing to record, so they still sync here as before.
+ * We now send ALL calls (both connected and missed) through this metadata path so that they appear
+ * in the CRM even if a recording file is not found or recording is disabled.
  */
 export async function syncCallLogsToBackend(): Promise<SyncCallsResult> {
   const { accessToken, currentOrganizationId, lastSyncedAt, syncWatermarkVersion, markSynced } = useAppStore.getState();
@@ -62,12 +60,10 @@ export async function syncCallLogsToBackend(): Promise<SyncCallsResult> {
     (call): call is Candidate =>
       Boolean(call.number && call.timestamp && (!effectiveLastSyncedAt || call.timestamp > effectiveLastSyncedAt)),
   );
-  const missedCandidates = candidates.filter((c) => !c.duration || c.duration <= 0);
-
   const totals: SyncCallsResult = { synced: 0, skipped: 0, total: 0, recordingsSynced: 0 };
 
-  if (missedCandidates.length > 0) {
-    const payloads: DeviceCallPayload[] = missedCandidates.map((call) => ({
+  if (candidates.length > 0) {
+    const payloads: DeviceCallPayload[] = candidates.map((call) => ({
       phoneNumber: call.number,
       contactName: call.name ?? undefined,
       type: call.type,
