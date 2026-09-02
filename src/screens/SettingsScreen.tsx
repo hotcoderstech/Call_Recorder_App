@@ -86,15 +86,9 @@ export default function SettingsScreen() {
     try {
       const result = await syncCallLogsToBackend();
       if (result.synced === 0 && result.recordingsSynced === 0) {
-        Alert.alert(
-          'Sync failed',
-          `No data was added to the CRM. ${result.skipped} call(s) skipped (not a lead, already synced, or no recording found yet).${formatRecordingDiag(result)}`,
-        );
+        Alert.alert('Up to date', 'No new data was added to the CRM.');
       } else {
-        Alert.alert(
-          'Sync complete',
-          `Synced ${result.synced} call(s) matching a lead's phone number. ${result.recordingsSynced} recording(s) added. ${result.skipped} skipped (not a lead, or already synced).`,
-        );
+        Alert.alert('Successfully added', `${result.synced} call(s) and ${result.recordingsSynced} call record(s) added successfully.`);
       }
     } catch (err: any) {
       Alert.alert('Sync failed', err.message || 'Could not sync call log.');
@@ -117,12 +111,9 @@ export default function SettingsScreen() {
     try {
       const result = await syncCallLogsToBackend();
       if (result.synced === 0 && result.recordingsSynced === 0) {
-        Alert.alert('Sync failed', `No data was added to the CRM. ${result.skipped} call(s) skipped.${formatRecordingDiag(result)}`);
+        Alert.alert('Up to date', 'No new data was added to the CRM.');
       } else {
-        Alert.alert(
-          'Sync complete',
-          `Synced ${result.synced} call(s), ${result.recordingsSynced} recording(s) added, ${result.skipped} skipped.`,
-        );
+        Alert.alert('Successfully added', `${result.synced} call(s) and ${result.recordingsSynced} call record(s) added successfully.`);
       }
     } catch (err: any) {
       Alert.alert('Sync failed', err.message || 'Could not sync call log.');
@@ -184,7 +175,7 @@ export default function SettingsScreen() {
             </View>
             <Switch value={isDark} onValueChange={handleToggleTheme} />
           </View>
-          <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <View style={styles.row}>
             <View style={styles.rowLeft}>
               <Text style={[styles.rowText, { color: colors.text, marginLeft: 32 }]}>Show Duration in List</Text>
             </View>
@@ -193,6 +184,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/*
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SECURITY</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -205,7 +197,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </View>
-
+      */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CRM SYNC</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -359,6 +351,15 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>APP INFO</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16, alignItems: 'center' }]}>
+          <Text style={[styles.rowText, { color: colors.text, fontWeight: 'bold', fontSize: 18, marginLeft: 0 }]}>Sales Tracker</Text>
+          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Version 1.0.0</Text>
+          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Developer by Hotcoders@2026</Text>
+        </View>
+      </View>
+
     </ScrollView>
   );
 }
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
   },
   section: {
