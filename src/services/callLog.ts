@@ -2,6 +2,7 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import { getCallHistory, CallLogRecord } from '../../modules/expo-call-log-reader';
 import { getContactMeta, getRecordingCallId } from './database';
 import { useAppStore } from '../store/useAppStore';
+import { normalizeApiBaseUrl } from '../utils/apiUrl';
 
 export interface EnrichedCallRecord extends CallLogRecord {
   id: string; // Unique ID for list rendering
@@ -58,7 +59,7 @@ export async function fetchEnrichedCallHistory(): Promise<EnrichedCallRecord[]> 
         const callId = getRecordingCallId(call.number, call.timestamp);
         if (callId) {
           const { apiBaseUrl, accessToken } = useAppStore.getState();
-          recordingPath = `${apiBaseUrl}/calls/${callId}/recording?token=${accessToken}`;
+          recordingPath = `${normalizeApiBaseUrl(apiBaseUrl)}/calls/${callId}/recording?token=${accessToken}`;
         }
       }
 

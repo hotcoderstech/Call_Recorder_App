@@ -20,6 +20,7 @@ const MIME_BY_EXT: Record<string, string> = {
   m4a: 'audio/mp4',
   mp3: 'audio/mpeg',
   amr: 'audio/amr',
+  awb: 'audio/amr-wb',
   '3gp': 'audio/3gpp',
   wav: 'audio/wav',
   ogg: 'audio/ogg',
@@ -73,6 +74,9 @@ export interface RecordingSyncDiagnostics {
   matchFailures: number;
   /** Decoded name of the last file that matched no call, so a mismatch can be diagnosed without device access. */
   lastUnmatchedFileName?: string;
+  alreadyInCrm: number;
+  uploadFailures: number;
+  lastUploadError?: string;
 }
 
 export async function matchAndUploadRecordings(candidates: CallCandidate[]): Promise<RecordingSyncDiagnostics> {
@@ -82,6 +86,8 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     filesAlreadyHandled: 0,
     candidatesWithDuration: 0,
     matchFailures: 0,
+    alreadyInCrm: 0,
+    uploadFailures: 0,
   };
 
   const { recordingsFolderUri } = useAppStore.getState();
@@ -97,7 +103,11 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     fileUris = await FileSystem.StorageAccessFramework.readDirectoryAsync(recordingsFolderUri);
   } catch (err) {
     console.error('Failed to read recordings folder', err);
-    return empty;
+    // Most commonly this is a "Downloads" shortcut URI picked in the SAF folder browser, which
+    // looks like a valid tree URI but can't actually be listed — surface it instead of failing silently.
+    throw new Error(
+      'Could not read the selected Call Recordings Folder. Go to Settings and re-pick it — make sure to browse into Internal Storage and select the actual recordings folder, not "Downloads".',
+    );
   }
 
   const diag: RecordingSyncDiagnostics = {
@@ -106,6 +116,8 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     filesAlreadyHandled: 0,
     candidatesWithDuration: withDuration.length,
     matchFailures: 0,
+    alreadyInCrm: 0,
+    uploadFailures: 0,
   };
 
   const unmatchedCalls = [...withDuration];
@@ -138,6 +150,33 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
       }
     }
 
+    // Some OEM recorders (e.g. "Name (Tag)-2609031017.awb") instead embed a YYMMDDHHmm timestamp
+    // right before the extension — decode that too rather than leaving modificationTimeMs unknown.
+    if (modificationTimeMs === null) {
+      // Must follow a separator (not be the whole name, e.g. a bare phone number) and be a real date.
+      const shortMatch = decodedName.match(/[-_ ](\d{10})\.\w+$/);
+      if (shortMatch) {
+        const [, yy, mm, dd, hh, min] = shortMatch[1].match(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) || [];
+        if (yy) {
+          const year = 2000 + parseInt(yy, 10);
+          const month = parseInt(mm, 10);
+          const day = parseInt(dd, 10);
+          const hour = parseInt(hh, 10);
+          const minute = parseInt(min, 10);
+          const valid =
+            year >= 2015 && year <= new Date().getFullYear() + 1 &&
+            month >= 1 && month <= 12 && day >= 1 && day <= 31 && hour <= 23 && minute <= 59;
+          if (valid) {
+            const parsed = new Date(year, month - 1, day, hour, minute);
+            // Reject dates that Date silently rolled over (e.g. Feb 31 -> Mar 3).
+            if (parsed.getMonth() === month - 1 && parsed.getDate() === day) {
+              modificationTimeMs = parsed.getTime();
+            }
+          }
+        }
+      }
+    }
+
     const timeDelta = (i: number) =>
       modificationTimeMs === null ? Infinity : Math.abs(unmatchedCalls[i].timestamp - modificationTimeMs);
 
@@ -146,15 +185,23 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     // Pass 1: exact phone-number-in-filename match (strongest signal) — among ties, closest in time.
     let bestIndex = -1;
     let bestDelta = Infinity;
+    let phoneMatchCount = 0;
     for (let i = 0; i < unmatchedCalls.length; i++) {
       const key = phoneMatchKey(unmatchedCalls[i].number);
       if (key === null || !decodedName.includes(key)) continue;
+      phoneMatchCount++;
       const delta = timeDelta(i);
-      if (delta < bestDelta) {
+      // bestIndex === -1 check matters when modificationTimeMs is unknown for every candidate:
+      // delta is then Infinity for all of them, and "Infinity < Infinity" is false, so without this
+      // the very first (and only) match would never get selected.
+      if (bestIndex === -1 || delta < bestDelta) {
         bestDelta = delta;
         bestIndex = i;
       }
     }
+    // With no file time we can't tell which call a number-only match belongs to — only accept it
+    // when it's unambiguous, otherwise leave the file unmatched rather than attach it to the wrong call.
+    if (modificationTimeMs === null && phoneMatchCount > 1) bestIndex = -1;
 
     // Pass 2: saved-contact-name-in-filename match — many recorders (e.g. built-in dialer call
     // recording) name files after the contact ("Prakash Rvs MCA_...m4a"), not the raw number.
@@ -166,7 +213,7 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
         const normalizedName = normalizeForNameMatch(rawName);
         if (normalizedName.length < 4 || !normalizedFileName.includes(normalizedName)) continue;
         const delta = timeDelta(i);
-        if (delta < bestDelta) {
+        if (bestIndex === -1 || delta < bestDelta) {
           bestDelta = delta;
           bestIndex = i;
         }
@@ -204,7 +251,7 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     const localCopyUri = `${FileSystem.cacheDirectory}upload-${Date.now()}-${match.timestamp}.${fileUri.split('.').pop() || 'm4a'}`;
     try {
       await FileSystem.copyAsync({ from: fileUri, to: localCopyUri });
-      const synced = await callsApi.syncRecordedCall(
+      const outcome = await callsApi.syncRecordedCall(
         {
           phoneNumber: match.number,
           contactName: match.name ?? undefined,
@@ -216,11 +263,14 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
         guessMimeType(fileUri),
       );
       markRecordingFileUploaded(fileUri);
-      if (synced) diag.uploadedCount++;
-      // synced === false means the number isn't linked to any lead — expected, not an error;
+      if (outcome === 'created') diag.uploadedCount++;
+      else if (outcome === 'duplicate') diag.alreadyInCrm++;
+      // 'not_a_lead' means the number isn't linked to any lead — expected, not an error;
       // the file is still marked handled since retrying won't change that outcome on its own.
     } catch (err: any) {
       console.error('Failed to upload call recording', fileUri, err?.response?.data || err.message);
+      diag.uploadFailures++;
+      diag.lastUploadError = err?.response?.data?.error?.message || err?.message || 'Upload failed';
       // Leave unmarked so it's retried on the next sync.
     } finally {
       FileSystem.deleteAsync(localCopyUri, { idempotent: true }).catch(() => {});

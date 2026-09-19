@@ -3,16 +3,19 @@ import { NavigationContainer, DefaultTheme, DarkTheme as NavDarkTheme } from '@r
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
 import ContactDetailsScreen from '../screens/ContactDetailsScreen';
+import LeadViewScreen from '../screens/LeadViewScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { useAppStore } from '../store/useAppStore';
 import { LightTheme, DarkTheme } from '../utils/theme';
 import { useColorScheme } from 'react-native';
 import { initDatabase } from '../services/database';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { LeadSummary } from '../services/api';
 
 export type RootStackParamList = {
   MainTabs: undefined;
   ContactDetails: { contactId: string; name: string };
+  LeadView: { leadId: string; lead?: LeadSummary };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +60,7 @@ export default function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
         <Stack.Screen name="ContactDetails" component={ContactDetailsScreen} />
+        <Stack.Screen name="LeadView" component={LeadViewScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

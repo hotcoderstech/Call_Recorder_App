@@ -90,3 +90,53 @@ export function setContactNotes(phoneNumber: string, name: string | null, notes:
     [phoneNumber, name, notes, tag]
   );
 }
+
+export interface ReminderItem {
+  id: number;
+  phoneNumber: string;
+  contactName?: string | null;
+  reminderText: string;
+  reminderDate: number;
+  priority?: string | null;
+  isCompleted: number;
+}
+
+export function addReminder(data: {
+  phoneNumber: string;
+  contactName?: string | null;
+  reminderText: string;
+  reminderDate: number;
+  priority?: string;
+}) {
+  try {
+    db.runSync(
+      'INSERT INTO reminders (phoneNumber, contactName, reminderText, reminderDate, priority, isCompleted) VALUES (?, ?, ?, ?, ?, 0)',
+      [data.phoneNumber, data.contactName || null, data.reminderText, data.reminderDate, data.priority || 'medium']
+    );
+  } catch (err) {
+    // Fallback if priority/contactName columns aren't present yet
+    db.runSync(
+      'INSERT INTO reminders (phoneNumber, reminderText, reminderDate, isCompleted) VALUES (?, ?, ?, 0)',
+      [data.phoneNumber, data.reminderText, data.reminderDate]
+    );
+  }
+}
+
+export function getReminders(includeCompleted = false): ReminderItem[] {
+  try {
+    if (includeCompleted) {
+      return db.getAllSync<ReminderItem>('SELECT * FROM reminders ORDER BY reminderDate ASC');
+    }
+    return db.getAllSync<ReminderItem>('SELECT * FROM reminders WHERE isCompleted = 0 ORDER BY reminderDate ASC');
+  } catch {
+    return [];
+  }
+}
+
+export function toggleReminderComplete(id: number, completed: boolean) {
+  db.runSync('UPDATE reminders SET isCompleted = ? WHERE id = ?', [completed ? 1 : 0, id]);
+}
+
+export function deleteReminder(id: number) {
+  db.runSync('DELETE FROM reminders WHERE id = ?', [id]);
+}

@@ -43,8 +43,23 @@ type Candidate = { number: string; type: number; timestamp: number; duration: nu
  * those go exclusively through matchAndUploadRecordings below. Missed/rejected/no-answer calls
  * (duration 0) have nothing to record, so they still sync here as before.
  */
-export async function syncCallLogsToBackend(): Promise<SyncCallsResult> {
-  const { accessToken, currentOrganizationId, lastSyncedAt, syncWatermarkVersion, markSynced } = useAppStore.getState();
+export function syncCallLogsToBackend(): Promise<SyncCallsResult> {
+  // Auto-sync and the manual Sync button can fire at the same moment. Two overlapping runs match and
+  // upload the same recording twice (the second gets a DUPLICATE_VALUE from the backend), and the
+  // manual run would then report "Up to date" even though the auto run just added the data. Sharing
+  // one in-flight run means every caller gets the real result.
+  if (!inFlightSync) {
+    inFlightSync = runSync().finally(() => {
+      inFlightSync = null;
+    });
+  }
+  return inFlightSync;
+}
+
+let inFlightSync: Promise<SyncCallsResult> | null = null;
+
+async function runSync(): Promise<SyncCallsResult> {
+  const { accessToken, currentOrganizationId, lastSyncedAt, syncWatermarkVersion, syncStartAt, markSynced } = useAppStore.getState();
   if (!accessToken || !currentOrganizationId) {
     throw new Error('Not logged in');
   }
@@ -55,7 +70,9 @@ export async function syncCallLogsToBackend(): Promise<SyncCallsResult> {
   }
 
   // A stale watermark from before a matching fix would otherwise skip calls forever — do one full re-scan.
-  const effectiveLastSyncedAt = syncWatermarkVersion < CURRENT_SYNC_WATERMARK_VERSION ? null : lastSyncedAt;
+  // Calls made before the user logged in are never synced, so the login time is a floor either way.
+  const baseLastSyncedAt = syncWatermarkVersion < CURRENT_SYNC_WATERMARK_VERSION ? null : lastSyncedAt;
+  const effectiveLastSyncedAt = Math.max(baseLastSyncedAt ?? 0, syncStartAt ?? 0) || null;
 
   const rawCalls = await getCallHistory();
   const candidates = rawCalls.filter(
@@ -92,16 +109,21 @@ export async function syncCallLogsToBackend(): Promise<SyncCallsResult> {
   // itself) can show up well after a call's metadata was already synced by an earlier run.
   let recordingDiagnostics: RecordingSyncDiagnostics | undefined;
   try {
-    const recordingCutoff = Date.now() - RECORDING_LOOKBACK_MS;
+    const recordingCutoff = Math.max(Date.now() - RECORDING_LOOKBACK_MS, syncStartAt ?? 0);
     const recordingCandidates = rawCalls.filter(
       (call): call is Candidate => Boolean(call.number && call.timestamp && call.timestamp > recordingCutoff),
     );
     recordingDiagnostics = await matchAndUploadRecordings(recordingCandidates);
     totals.recordingsSynced = recordingDiagnostics.uploadedCount;
+    if (recordingDiagnostics.uploadFailures > 0) {
+      totals.recordingError = `${recordingDiagnostics.uploadFailures} recording(s) failed to upload: ${recordingDiagnostics.lastUploadError}`;
+    }
     await refreshRecordingAvailability(recordingCandidates);
-  } catch (err) {
-    // Recording capture is best-effort — never let it fail the call-log sync itself.
+  } catch (err: any) {
+    // Recording capture is best-effort — never let it fail the call-log sync itself, but still
+    // surface why it didn't run (e.g. an unreadable recordings folder) instead of only logging it.
     console.error('Recording sync step failed', err);
+    totals.recordingError = err?.message || 'Recording sync failed';
   }
 
   totals.recordingDiagnostics = recordingDiagnostics;
