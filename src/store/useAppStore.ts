@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { normalizeApiBaseUrl } from '../utils/apiUrl';
 
 /**
  * Bump this whenever a sync-affecting bug fix means previously-recorded watermarks can't be
@@ -42,6 +43,8 @@ interface AppState {
   user: AuthUser | null;
   organizations: AuthOrganization[];
   currentOrganizationId: string | null;
+  /** When the user logged in — calls/recordings from before this moment are never synced (unless a "sync from" date is picked). */
+  syncStartAt: number | null;
   setSession: (accessToken: string, user: AuthUser, refreshToken: string) => void;
   setOrganizations: (organizations: AuthOrganization[]) => void;
   setCurrentOrganization: (organizationId: string, accessToken: string) => void;
@@ -66,6 +69,10 @@ interface AppState {
   /** SAF (Storage Access Framework) URI for the folder where the device auto-saves call recordings. */
   recordingsFolderUri: string | null;
   setRecordingsFolderUri: (uri: string | null) => void;
+
+  /** Message from the most recent auto-sync failure, so it can be surfaced in the UI instead of only logged. Cleared on the next successful sync. */
+  lastSyncError: string | null;
+  setLastSyncError: (message: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -83,15 +90,18 @@ export const useAppStore = create<AppState>()(
       // Real production backend by default — this ships in the installed APK, so it must work
       // off the shelf, not just for a developer on the same LAN as a dev server. Change it in
       // Settings only for pointing a build at a local/staging backend during development.
-      apiBaseUrl: 'https://lead-management-fam-info-backend-1.onrender.com/api/v1',
-      setApiBaseUrl: (url) => set({ apiBaseUrl: url.trim().replace(/\/+$/, '') }),
+      apiBaseUrl: 'https://api-faminfomedia.onrender.com/api/v1',
+      setApiBaseUrl: (url) => set({ apiBaseUrl: normalizeApiBaseUrl(url) }),
 
       accessToken: null,
       refreshToken: null,
       user: null,
       organizations: [],
       currentOrganizationId: null,
-      setSession: (accessToken, user, refreshToken) => set({ accessToken, user, refreshToken }),
+      syncStartAt: null,
+      // Keep an existing cutoff so a repeated setSession doesn't push the floor forward.
+      setSession: (accessToken, user, refreshToken) =>
+        set((state) => ({ accessToken, user, refreshToken, syncStartAt: state.syncStartAt ?? Date.now() })),
       setOrganizations: (organizations) => set({ organizations }),
       setCurrentOrganization: (organizationId, accessToken) =>
         set({ currentOrganizationId: organizationId, accessToken }),
@@ -104,6 +114,7 @@ export const useAppStore = create<AppState>()(
           organizations: [],
           currentOrganizationId: null,
           lastSyncedAt: null,
+          syncStartAt: null,
         }),
 
       lastSyncedAt: null,
@@ -115,6 +126,8 @@ export const useAppStore = create<AppState>()(
       setSyncFromDate: (timestamp) =>
         set({
           syncFromDate: timestamp,
+          // An explicit "sync from" date overrides the login-time cutoff.
+          syncStartAt: null,
           // One tick before the chosen date, so the next sync's ">" comparison includes it.
           lastSyncedAt: timestamp - 1,
           syncWatermarkVersion: CURRENT_SYNC_WATERMARK_VERSION,
@@ -123,20 +136,22 @@ export const useAppStore = create<AppState>()(
 
       recordingsFolderUri: null,
       setRecordingsFolderUri: (uri) => set({ recordingsFolderUri: uri }),
+
+      lastSyncError: null,
+      setLastSyncError: (message) => set({ lastSyncError: message }),
     }),
     {
       name: 'app-preferences',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
-      // A local LAN-IP apiBaseUrl briefly leaked into the default (see git history) and, since this
-      // whole store persists unfiltered, got baked into AsyncStorage on any device that opened the
-      // app during that window — a plain code fix to the default above doesn't undo that. This
-      // one-time migration corrects just that stale value on next load, without touching the
-      // logged-in session or sync watermark for anyone else.
+      version: 3,
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<AppState> | undefined;
-        if (version < 2 && state) {
-          state.apiBaseUrl = 'https://lead-management-fam-info-backend-1.onrender.com/api/v1';
+        if (state) {
+          // Only repair known-bad URLs (old builds / the retired host) — never overwrite a
+          // custom staging or local URL the developer picked in Settings.
+          if (version < 3 || !state.apiBaseUrl || state.apiBaseUrl.includes('lead-management')) {
+            state.apiBaseUrl = 'https://api-faminfomedia.onrender.com/api/v1';
+          }
         }
         return state as AppState;
       },

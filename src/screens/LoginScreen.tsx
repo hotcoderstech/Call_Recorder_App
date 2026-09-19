@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -50,6 +50,10 @@ export default function LoginScreen() {
   const [orgChoices, setOrgChoices] = useState<OrganizationSummary[] | null>(null);
   const [isSwitching, setIsSwitching] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    authApi.warmUp();
+  }, []);
 
   const fillDemoCredentials = () => {
     setIdentifier(DEMO_IDENTIFIER);

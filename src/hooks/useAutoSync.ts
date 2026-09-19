@@ -21,9 +21,11 @@ export function useAutoSync() {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      await syncCallLogsToBackend();
-    } catch (err) {
+      const result = await syncCallLogsToBackend();
+      useAppStore.getState().setLastSyncError(result.recordingError ?? null);
+    } catch (err: any) {
       console.warn('Auto-sync failed', err);
+      useAppStore.getState().setLastSyncError(err?.message || 'Auto-sync failed');
     } finally {
       inFlight.current = false;
     }

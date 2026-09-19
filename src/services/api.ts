@@ -1,11 +1,12 @@
 import axios from 'axios';
 import { useAppStore } from '../store/useAppStore';
+import { normalizeApiBaseUrl } from '../utils/apiUrl';
 
 export const apiClient = axios.create({ timeout: 15000 });
 
 apiClient.interceptors.request.use((config) => {
   const { apiBaseUrl, accessToken } = useAppStore.getState();
-  config.baseURL = apiBaseUrl;
+  config.baseURL = normalizeApiBaseUrl(apiBaseUrl);
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -23,7 +24,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
   try {
     const response = await axios.post(
-      `${apiBaseUrl}/auth/refresh`,
+      `${normalizeApiBaseUrl(apiBaseUrl)}/auth/refresh`,
       { refreshToken, organizationId: currentOrganizationId ?? undefined },
       { timeout: 15000 },
     );
@@ -72,10 +73,31 @@ export interface OrganizationSummary {
   roleCode?: string;
 }
 
+// The backend sits on a host that sleeps when idle, so the first request after a quiet period can
+// take 30-60s while it cold-starts. Login therefore uses a long timeout and retries when the server
+// couldn't be reached (no HTTP response), instead of failing the user's first attempt.
+const LOGIN_TIMEOUT_MS = 45000;
+const LOGIN_MAX_ATTEMPTS = 3;
+
 export const authApi = {
+  /** Fire-and-forget ping to wake a sleeping backend before the user submits credentials. */
+  warmUp(): void {
+    apiClient.get('/health', { timeout: LOGIN_TIMEOUT_MS }).catch(() => {});
+  },
+
   async login(identifier: string, password: string): Promise<LoginResult> {
-    const { data } = await apiClient.post('/auth/login', { identifier, password });
-    return data.data;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= LOGIN_MAX_ATTEMPTS; attempt++) {
+      try {
+        const { data } = await apiClient.post('/auth/login', { identifier, password }, { timeout: LOGIN_TIMEOUT_MS });
+        return data.data;
+      } catch (err: any) {
+        // A server response (wrong password, 4xx/5xx) is a real answer — only retry when unreachable.
+        if (err?.response) throw err;
+        lastError = err;
+      }
+    }
+    throw lastError;
   },
 };
 
@@ -100,9 +122,53 @@ export interface LeadSummary {
   phone: string;
 }
 
+export interface LeadActivityItem {
+  id: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  timestamp: string | number;
+}
+
+export interface PipelineStageItem {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface LeadDetails extends LeadSummary {
+  email?: string | null;
+  source?: string | null;
+  pipelineId?: string | null;
+  stage?: PipelineStageItem | null;
+  pipeline?: { id: string; name: string } | null;
+  pipelineStage?: string | null;
+  pipelineName?: string | null;
+  status?: string | null;
+  assignedTo?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  activities?: LeadActivityItem[];
+}
+
 export const leadsApi = {
   async searchMine(search: string): Promise<LeadSummary[]> {
     const { data } = await apiClient.get('/leads', { params: { search, limit: 20 } });
+    return data.data;
+  },
+
+  async getById(leadId: string): Promise<LeadDetails> {
+    const { data } = await apiClient.get(`/leads/${leadId}`);
+    return data.data;
+  },
+
+  async getPipelineStages(pipelineId: string): Promise<PipelineStageItem[]> {
+    const { data } = await apiClient.get(`/pipelines/${pipelineId}`);
+    return data.data.stages;
+  },
+
+  async updateStage(leadId: string, stageId: string): Promise<any> {
+    const { data } = await apiClient.post(`/leads/${leadId}/stage-change`, { stageId });
     return data.data;
   },
 
@@ -134,7 +200,14 @@ export interface SyncCallsResult {
     candidatesWithDuration: number;
     matchFailures: number;
     lastUnmatchedFileName?: string;
+    /** Matched recordings the CRM already had (nothing new to add). */
+    alreadyInCrm: number;
+    /** Matched recordings whose upload failed (network/server error) — retried on the next sync. */
+    uploadFailures: number;
+    lastUploadError?: string;
   };
+  /** Set when the recording-matching step failed outright (e.g. an unreadable folder) — surfaced separately since it doesn't fail the overall sync. */
+  recordingError?: string;
 }
 
 export interface RecordingMatch {
@@ -152,10 +225,10 @@ export const callsApi = {
   /**
    * Connected calls only ever land in the DB together with their recording (see backend
    * NOT_A_LEAD rejection) — this stores the call's metadata and its recording file in one request.
-   * Returns false (instead of throwing) when the number just isn't linked to any lead, since
-   * that's an expected, common outcome the caller shouldn't treat as a failure.
+   * Returns 'not_a_lead' / 'duplicate' (instead of throwing) when the number isn't linked to any
+   * lead or the call is already stored, since those are expected outcomes, not failures.
    */
-  async syncRecordedCall(payload: DeviceCallPayload, fileUri: string, mimeType: string): Promise<boolean> {
+  async syncRecordedCall(payload: DeviceCallPayload, fileUri: string, mimeType: string): Promise<'created' | 'duplicate' | 'not_a_lead'> {
     const form = new FormData();
     form.append('phoneNumber', payload.phoneNumber);
     form.append('timestamp', String(payload.timestamp));
@@ -166,10 +239,15 @@ export const callsApi = {
     form.append('file', { uri: fileUri, name, type: mimeType } as unknown as Blob);
 
     try {
-      await apiClient.post('/calls/recordings', form);
-      return true;
+      // Recording uploads carry an audio file (can be several MB over slow mobile data), so give
+      // this request a much longer timeout than the default 15s used for plain JSON calls.
+      await apiClient.post('/calls/recordings', form, { timeout: 60000 });
+      return 'created';
     } catch (err: any) {
-      if (err?.response?.data?.error?.code === 'NOT_A_LEAD') return false;
+      const code = err?.response?.data?.error?.code;
+      if (code === 'NOT_A_LEAD') return 'not_a_lead';
+      // The call + recording is already stored (e.g. uploaded by an earlier sync) — not a failure.
+      if (code === 'DUPLICATE_VALUE') return 'duplicate';
       throw err;
     }
   },
