@@ -37,6 +37,8 @@ export default function SettingsScreen() {
     clearSyncFromDate,
     recordingsFolderUri,
     setRecordingsFolderUri,
+    lastSyncError,
+    setLastSyncError,
     logout,
   } = useAppStore();
   const systemTheme = useColorScheme();
@@ -55,6 +57,18 @@ export default function SettingsScreen() {
     try {
       const result = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
       if (result.granted) {
+        // The system picker's "Downloads" shortcut returns a DownloadsProvider URI that looks like
+        // a normal SAF tree but can't actually be listed via readDirectoryAsync — catch that here
+        // with a clear message instead of letting every later sync fail silently on this folder.
+        try {
+          await FileSystem.StorageAccessFramework.readDirectoryAsync(result.directoryUri);
+        } catch {
+          Alert.alert(
+            'Wrong folder selected',
+            "That folder (likely \"Downloads\") can't be scanned for recordings. Please pick the actual folder your phone saves call recordings to — browse into Internal Storage and look for a folder like \"Call\", \"Recordings\", or \"CallRecordings\", not the Downloads shortcut.",
+          );
+          return;
+        }
         setRecordingsFolderUri(result.directoryUri);
         // A file that was wrongly marked "handled" by an earlier version of the matching logic
         // (before it could actually match/upload) would otherwise stay stuck forever — re-picking
@@ -75,27 +89,40 @@ export default function SettingsScreen() {
   };
 
   const formatRecordingDiag = (result: Awaited<ReturnType<typeof syncCallLogsToBackend>>) => {
+    if (result.recordingError) return `\n\nRecording sync error: ${result.recordingError}`;
     const d = result.recordingDiagnostics;
     if (!d) return '';
     const nameLine = d.lastUnmatchedFileName ? `\nUnmatched file example: ${d.lastUnmatchedFileName}` : '';
-    return `\n\nRecording debug: ${d.filesInFolder} file(s) in folder, ${d.filesAlreadyHandled} already handled, ${d.candidatesWithDuration} connected call(s) considered, ${d.matchFailures} file(s) didn't match any call, ${d.uploadedCount} uploaded.${nameLine}`;
+    return `\n\nRecording debug: ${d.filesInFolder} file(s) in folder, ${d.filesAlreadyHandled} already handled, ${d.candidatesWithDuration} connected call(s) considered, ${d.matchFailures} file(s) didn't match any call, ${d.uploadedCount} uploaded, ${d.alreadyInCrm} already in CRM.${nameLine}`;
   };
 
-  const handleSyncNow = async () => {
+  const runSyncWithAlert = async () => {
     setIsSyncing(true);
     try {
       const result = await syncCallLogsToBackend();
-      if (result.synced === 0 && result.recordingsSynced === 0) {
-        Alert.alert('Up to date', 'No new data was added to the CRM.');
+      setLastSyncError(result.recordingError ?? null);
+      const added = result.synced > 0 || result.recordingsSynced > 0;
+      if (result.recordingError) {
+        // Something failed (e.g. an upload) — say so, even if other items did sync.
+        const addedLine = added ? `${result.synced} call(s) and ${result.recordingsSynced} call record(s) were added.\n\n` : '';
+        Alert.alert('Sync failed', `${addedLine}${result.recordingError}`);
+      } else if (added) {
+        Alert.alert(
+          'Successfully added',
+          `${result.synced} call(s) and ${result.recordingsSynced} call record(s) added successfully.${formatRecordingDiag(result)}`,
+        );
       } else {
-        Alert.alert('Successfully added', `${result.synced} call(s) and ${result.recordingsSynced} call record(s) added successfully.`);
+        Alert.alert('Up to date', `Everything on this phone is already in the CRM.${formatRecordingDiag(result)}`);
       }
     } catch (err: any) {
+      setLastSyncError(err.message || 'Could not sync call log.');
       Alert.alert('Sync failed', err.message || 'Could not sync call log.');
     } finally {
       setIsSyncing(false);
     }
   };
+
+  const handleSyncNow = runSyncWithAlert;
 
   const handlePickSyncFromDate = (event: DateTimePickerEvent, date?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
@@ -106,21 +133,7 @@ export default function SettingsScreen() {
     setSyncFromDate(normalized.getTime());
   };
 
-  const handleSyncFromDate = async () => {
-    setIsSyncing(true);
-    try {
-      const result = await syncCallLogsToBackend();
-      if (result.synced === 0 && result.recordingsSynced === 0) {
-        Alert.alert('Up to date', 'No new data was added to the CRM.');
-      } else {
-        Alert.alert('Successfully added', `${result.synced} call(s) and ${result.recordingsSynced} call record(s) added successfully.`);
-      }
-    } catch (err: any) {
-      Alert.alert('Sync failed', err.message || 'Could not sync call log.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const handleSyncFromDate = runSyncWithAlert;
 
   const handleClearSyncFromDate = () => {
     clearSyncFromDate();
@@ -200,6 +213,20 @@ export default function SettingsScreen() {
       */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CRM SYNC</Text>
+        {lastSyncError ? (
+          <View style={[styles.banner, { backgroundColor: colors.notification + '20', borderColor: colors.notification }]}>
+            <Text style={[styles.bannerText, { color: colors.notification }]}>
+              Last sync failed: {lastSyncError}
+            </Text>
+          </View>
+        ) : null}
+        {!recordingsFolderUri ? (
+          <View style={[styles.banner, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
+            <Text style={[styles.bannerText, { color: colors.text }]}>
+              Call Recordings Folder isn't set yet — answered calls won't sync until you pick it below.
+            </Text>
+          </View>
+        ) : null}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
@@ -377,6 +404,17 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+  },
+  banner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 10,
+  },
+  bannerText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   sectionTitle: {
     fontSize: 13,

@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Linking, TouchableOpacity, useColorScheme } from 'react-native';
-import { Phone } from 'lucide-react-native';
+import { Phone, ChevronRight } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAppStore } from '../store/useAppStore';
 import { LightTheme, DarkTheme } from '../utils/theme';
 import { leadsApi, LeadSummary } from '../services/api';
 
 export default function LeadsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { theme: storedTheme } = useAppStore();
   const systemTheme = useColorScheme();
   const isDark = storedTheme === 'system' ? systemTheme === 'dark' : storedTheme === 'dark';
@@ -46,7 +50,11 @@ export default function LeadsScreen() {
   const renderItem = ({ item }: { item: LeadSummary }) => {
     const displayName = item.fullName || [item.firstName, item.lastName].filter(Boolean).join(' ') || 'Unknown Lead';
     return (
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <TouchableOpacity
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => navigation.navigate('LeadView', { leadId: item.id, lead: item })}
+        activeOpacity={0.7}
+      >
         <View style={styles.infoContainer}>
           <Text style={[styles.nameText, { color: colors.text }]}>{displayName}</Text>
           <Text style={[styles.phoneText, { color: colors.textMuted }]}>{item.phone || 'No phone number'}</Text>
@@ -54,12 +62,16 @@ export default function LeadsScreen() {
         {!!item.phone && (
           <TouchableOpacity 
             style={[styles.callButton, { backgroundColor: colors.primary + '20' }]} 
-            onPress={() => handleCall(item.phone)}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleCall(item.phone);
+            }}
           >
-            <Phone color={colors.primary} size={20} />
+            <Phone color={colors.primary} size={18} />
           </TouchableOpacity>
         )}
-      </View>
+        <ChevronRight color={colors.textMuted} size={20} style={{ marginLeft: 6 }} />
+      </TouchableOpacity>
     );
   };
 
