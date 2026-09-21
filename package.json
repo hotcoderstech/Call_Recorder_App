@@ -1,5 +1,5 @@
 {
-  "name": "mobile_call_records",
+  "name": "faminfo-sales",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {

@@ -54,8 +54,8 @@ export default function BottomTabNavigator() {
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
         headerLeft: () => (
-          <Text style={{ marginLeft: 16, fontSize: 16, fontWeight: 'bold', color: colors.text }}>
-            {route.name}
+          <Text style={{ marginLeft: 16, fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+            {route.name === 'Home' ? 'FamInfo Sales' : route.name}
           </Text>
         ),
         headerTitle: () => <HeaderDateCard isDark={isDark} colors={colors} />,

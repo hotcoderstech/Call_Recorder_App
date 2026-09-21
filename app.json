@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Sales Tracker",
+    "name": "FamInfo Sales",
     "slug": "Mobile_Call_Records",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,7 +22,7 @@
         "android.permission.ACCESS_NETWORK_STATE"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

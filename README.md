@@ -1,4 +1,4 @@
-# leadflow mobile
+# FamInfo Sales
 
 Expo/React Native companion app for telecallers: reads the device's call
 log (via the custom `expo-call-log-reader` native module), captures call

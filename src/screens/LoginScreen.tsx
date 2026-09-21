@@ -140,8 +140,15 @@ export default function LoginScreen() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.logoContainer}>
-            <TouchableOpacity onPress={fillDemoCredentials} activeOpacity={0.8}>
-              <Text style={styles.logoText}>Faminfo</Text>
+            <TouchableOpacity onPress={fillDemoCredentials} activeOpacity={0.8} style={styles.logoWrapper}>
+              <View style={styles.logoCard}>
+                <Image
+                  source={require('../../assets/fam-logo.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.logoSubtitle}>FamInfo Sales</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -269,13 +276,35 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 28,
     marginBottom: 20,
   },
-  logoText: {
+  logoWrapper: {
+    alignItems: 'center',
+  },
+  logoCard: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 170,
+    height: 52,
+  },
+  logoSubtitle: {
     color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 10,
+    letterSpacing: 0.5,
   },
   
   card: {

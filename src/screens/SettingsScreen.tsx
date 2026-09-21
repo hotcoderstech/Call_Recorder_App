@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Image } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { LightTheme, DarkTheme } from '../utils/theme';
 import { useColorScheme } from 'react-native';
@@ -380,10 +380,15 @@ export default function SettingsScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>APP INFO</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 16, alignItems: 'center' }]}>
-          <Text style={[styles.rowText, { color: colors.text, fontWeight: 'bold', fontSize: 18, marginLeft: 0 }]}>Sales Tracker</Text>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 20, alignItems: 'center' }]}>
+          <Image
+            source={require('../../assets/fam-logo-square.png')}
+            style={{ width: 64, height: 64, borderRadius: 12, marginBottom: 12 }}
+            resizeMode="contain"
+          />
+          <Text style={[styles.rowText, { color: colors.text, fontWeight: 'bold', fontSize: 18, marginLeft: 0 }]}>FamInfo Sales</Text>
           <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Version 1.0.0</Text>
-          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Developer by Hotcoders@2026</Text>
+          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Developed by Hotcoders@2026</Text>
         </View>
       </View>
 
