@@ -45,6 +45,8 @@ yarn-error.*
 # Extra
 build/
 LOCAL-NOTES.md
+*.apk
+app build apk
 
 # Ignored from modules
 modules/**/android/build/
