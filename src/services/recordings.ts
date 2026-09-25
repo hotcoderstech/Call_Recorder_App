@@ -16,6 +16,12 @@ interface CallCandidate {
 }
 
 const MATCH_WINDOW_MS = 3 * 60 * 1000; // ±3 minutes between a call's start time and the recording file's mtime
+// Pass 1/2 (phone number or contact name embedded in the filename) are stronger signals than mtime
+// alone, so they tolerate a looser window than MATCH_WINDOW_MS — but without ANY bound, an old,
+// previously-unmatched recording (e.g. from a call that never got logged) whose filename happens to
+// contain the same number/name as today's call would still win the match over the real, current
+// recording. Bounding it to a day prevents a stale file from being attached to a fresh call log entry.
+const NAME_OR_NUMBER_MATCH_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MIME_BY_EXT: Record<string, string> = {
   m4a: 'audio/mp4',
   mp3: 'audio/mpeg',
@@ -189,8 +195,12 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     for (let i = 0; i < unmatchedCalls.length; i++) {
       const key = phoneMatchKey(unmatchedCalls[i].number);
       if (key === null || !decodedName.includes(key)) continue;
-      phoneMatchCount++;
       const delta = timeDelta(i);
+      // A file with a known mtime that's nowhere near this call is almost certainly an old,
+      // previously-unmatched recording from a different call with the same number — don't let it
+      // steal the match from the actual current call.
+      if (modificationTimeMs !== null && delta > NAME_OR_NUMBER_MATCH_WINDOW_MS) continue;
+      phoneMatchCount++;
       // bestIndex === -1 check matters when modificationTimeMs is unknown for every candidate:
       // delta is then Infinity for all of them, and "Infinity < Infinity" is false, so without this
       // the very first (and only) match would never get selected.
@@ -207,17 +217,25 @@ export async function matchAndUploadRecordings(candidates: CallCandidate[]): Pro
     // recording) name files after the contact ("Prakash Rvs MCA_...m4a"), not the raw number.
     // Require a reasonably long normalized name to avoid short-string false positives.
     if (bestIndex === -1) {
+      let nameMatchCount = 0;
       for (let i = 0; i < unmatchedCalls.length; i++) {
         const rawName = unmatchedCalls[i].name;
         if (!rawName) continue;
         const normalizedName = normalizeForNameMatch(rawName);
         if (normalizedName.length < 4 || !normalizedFileName.includes(normalizedName)) continue;
         const delta = timeDelta(i);
+        // Same staleness guard as the phone-number pass — a distant mtime means this is likely an
+        // old recording of a different call with the same contact, not today's call.
+        if (modificationTimeMs !== null && delta > NAME_OR_NUMBER_MATCH_WINDOW_MS) continue;
+        nameMatchCount++;
         if (bestIndex === -1 || delta < bestDelta) {
           bestDelta = delta;
           bestIndex = i;
         }
       }
+      // Same reasoning as the phone-number pass: with no file time, an ambiguous name match across
+      // multiple calls can't be resolved safely, so leave it unmatched rather than guess wrong.
+      if (modificationTimeMs === null && nameMatchCount > 1) bestIndex = -1;
     }
 
     // Pass 3: fall back to modification-time proximity alone, within the match window.

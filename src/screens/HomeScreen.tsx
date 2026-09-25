@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Dimensions, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppStore } from '../store/useAppStore';
@@ -54,6 +54,14 @@ export default function HomeScreen() {
 
   const [calls, setCalls] = useState<EnrichedCallRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   const loadData = async () => {
     const records = await fetchEnrichedCallHistory();
@@ -186,6 +194,39 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={[styles.greeting, { color: colors.text }]}>Welcome, {user?.firstName || 'User'}!</Text>
         <Text style={[styles.subtitle, { color: colors.textMuted, fontStyle: 'italic' }]}>"{PROVERBS[(new Date().getDate() - 1) % PROVERBS.length]}"</Text>
+      </View>
+
+      {/* Date Card */}
+      <View
+        style={[
+          styles.dateCard,
+          {
+            backgroundColor: isDark ? '#1F2937' : '#EFF6FF',
+            borderColor: isDark ? '#374151' : '#DBEAFE',
+          },
+        ]}
+      >
+        <View style={styles.dateCardLeft}>
+          <Text
+            style={[
+              styles.dateDayText,
+              { color: isDark ? '#60A5FA' : '#2563EB' },
+            ]}
+          >
+            {format(new Date(), 'EEEE')}
+          </Text>
+          <Text style={[styles.dateFullText, { color: colors.text }]}>
+            {format(new Date(), 'MMMM d, yyyy')}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.dateIconWrapper,
+            { backgroundColor: isDark ? '#374151' : '#DBEAFE' },
+          ]}
+        >
+          <Calendar size={22} color={isDark ? '#60A5FA' : '#2563EB'} />
+        </View>
       </View>
 
       <View style={[styles.summaryGrid, { marginTop: 10 }]}>

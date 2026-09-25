@@ -116,7 +116,7 @@ export default function AnalyticsScreen() {
       label: monthNames[index],
       labelTextStyle: { 
         color: index === currentMonth ? colors.text : colors.textMuted, 
-        fontWeight: index === currentMonth ? 'bold' : 'normal',
+        fontWeight: (index === currentMonth ? 'bold' : 'normal') as 'bold' | 'normal',
         fontSize: 10,
       }
     };
