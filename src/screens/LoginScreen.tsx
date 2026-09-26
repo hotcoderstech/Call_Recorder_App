@@ -130,11 +130,11 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#121212' : '#F5F5FC' }} contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
+      <ScrollView style={{ flex: 1, backgroundColor: isDark ? '#121212' : '#FFFFFF' }} contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
         
         {/* Top Gradient Section */}
         <LinearGradient 
-          colors={['#2D34E5', '#4E53EF', '#6B40ED']} 
+          colors={['#851B2D', '#A21E33', '#BD2841']} 
           style={styles.topGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -209,7 +209,7 @@ export default function LoginScreen() {
             disabled={isSubmitting}
           >
             <LinearGradient
-              colors={['#4A3DF4', '#B355F6']}
+              colors={['#A21E33', '#BD2841']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.signInGradient, { opacity: isSubmitting ? 0.7 : 1 }]}

@@ -1,12 +1,36 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, Platform, Alert, ActivityIndicator, Image } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Switch,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+  Alert,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { LightTheme, DarkTheme } from '../utils/theme';
 import { useColorScheme } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as FileSystem from 'expo-file-system/legacy';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Moon, Shield, Download, Trash2, RefreshCw, LogOut, User, Clock, CalendarClock, Calendar, X, FolderOpen } from 'lucide-react-native';
+import {
+  Moon,
+  Clock,
+  User,
+  FolderOpen,
+  Calendar,
+  RefreshCw,
+  LogOut,
+  Download,
+  Trash2,
+  ChevronRight,
+  AlertCircle,
+  X,
+} from 'lucide-react-native';
 import { syncCallLogsToBackend } from '../services/sync';
 import { resetUploadedRecordings } from '../services/database';
 
@@ -41,6 +65,7 @@ export default function SettingsScreen() {
     setLastSyncError,
     logout,
   } = useAppStore();
+
   const systemTheme = useColorScheme();
   const isDark = storedTheme === 'system' ? systemTheme === 'dark' : storedTheme === 'dark';
   const colors = isDark ? DarkTheme.colors : LightTheme.colors;
@@ -57,9 +82,6 @@ export default function SettingsScreen() {
     try {
       const result = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
       if (result.granted) {
-        // The system picker's "Downloads" shortcut returns a DownloadsProvider URI that looks like
-        // a normal SAF tree but can't actually be listed via readDirectoryAsync — catch that here
-        // with a clear message instead of letting every later sync fail silently on this folder.
         try {
           await FileSystem.StorageAccessFramework.readDirectoryAsync(result.directoryUri);
         } catch {
@@ -70,13 +92,7 @@ export default function SettingsScreen() {
           return;
         }
         setRecordingsFolderUri(result.directoryUri);
-        // A file that was wrongly marked "handled" by an earlier version of the matching logic
-        // (before it could actually match/upload) would otherwise stay stuck forever — re-picking
-        // the folder is the user-facing way to force every file to be reconsidered.
         resetUploadedRecordings();
-        // Without this, nothing actually syncs until the next foreground/interval auto-sync (up to
-        // 10 min later) or the user finds "Sync Now" separately — picking the folder looked like it
-        // did nothing. Sync right away so recordings already sitting in the folder go up immediately.
         await handleSyncNow();
       }
     } catch (err: any) {
@@ -103,7 +119,6 @@ export default function SettingsScreen() {
       setLastSyncError(result.recordingError ?? null);
       const added = result.synced > 0 || result.recordingsSynced > 0;
       if (result.recordingError) {
-        // Something failed (e.g. an upload) — say so, even if other items did sync.
         const addedLine = added ? `${result.synced} call(s) and ${result.recordingsSynced} call record(s) were added.\n\n` : '';
         Alert.alert('Sync failed', `${addedLine}${result.recordingError}`);
       } else if (added) {
@@ -146,252 +161,394 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleToggleAppLock = async (value: boolean) => {
-    if (value) {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert('Not Supported', 'Your device does not support biometric authentication or no biometrics are enrolled.');
-        return;
-      }
-      
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to enable App Lock',
-      });
-      
-      if (result.success) {
-        setAppLockEnabled(true);
-      }
-    } else {
-      setAppLockEnabled(false);
-    }
-  };
-
   const handleExport = () => {
     Alert.alert('Export', 'Export functionality will generate a CSV or PDF file.');
   };
 
+  const handleClearAppData = () => {
+    Alert.alert(
+      'Clear App Data',
+      'Are you sure you want to reset app cache and sync state? You will not lose calls on your phone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear Data',
+          style: 'destructive',
+          onPress: () => {
+            resetUploadedRecordings();
+            Alert.alert('Success', 'Local sync cache has been reset.');
+          },
+        },
+      ],
+    );
+  };
+
+  // Reusable card & badge colors
+  const cardBg = isDark ? '#1C1F26' : '#FFFFFF';
+  const cardBorder = isDark ? '#2B3240' : '#EDF2F7';
+  const dividerColor = isDark ? '#262D3D' : '#F1F5F9';
+  const pinkBadgeBg = isDark ? '#311820' : '#FDF2F4';
+  const tealBadgeBg = isDark ? '#132C28' : '#E6F7F5';
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
-      </View>
-
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* 1. APPEARANCE */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>APPEARANCE</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={styles.sectionHeader}>APPEARANCE</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Dark Mode */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <Moon color={colors.primary} size={20} />
-              <Text style={[styles.rowText, { color: colors.text }]}>Dark Mode</Text>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Moon color="#A21E33" size={19} />
+              </View>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Dark Mode</Text>
             </View>
-            <Switch value={isDark} onValueChange={handleToggleTheme} />
+            <Switch
+              value={isDark}
+              onValueChange={handleToggleTheme}
+              trackColor={{
+                false: isDark ? '#334155' : '#E2E8F0',
+                true: isDark ? '#4A1D27' : '#FCE7EB',
+              }}
+              thumbColor={isDark ? (isDark ? '#E05B71' : '#94A3B8') : (isDark ? '#A21E33' : '#FFFFFF')}
+              ios_backgroundColor={isDark ? '#334155' : '#E2E8F0'}
+            />
           </View>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Show Duration in List */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <Text style={[styles.rowText, { color: colors.text, marginLeft: 32 }]}>Show Duration in List</Text>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Clock color="#A21E33" size={19} />
+              </View>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Show Duration in List</Text>
             </View>
-            <Switch value={showDuration} onValueChange={setShowDuration} />
+            <Switch
+              value={showDuration}
+              onValueChange={setShowDuration}
+              trackColor={{
+                false: isDark ? '#334155' : '#E2E8F0',
+                true: isDark ? '#4A1D27' : '#FCE7EB',
+              }}
+              thumbColor={showDuration ? (isDark ? '#E05B71' : '#A21E33') : (isDark ? '#94A3B8' : '#FFFFFF')}
+              ios_backgroundColor={isDark ? '#334155' : '#E2E8F0'}
+            />
           </View>
         </View>
       </View>
 
-      {/*
+      {/* 2. CRM SYNC */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>SECURITY</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Shield color={colors.primary} size={20} />
-              <Text style={[styles.rowText, { color: colors.text }]}>App Lock (Biometrics)</Text>
-            </View>
-            <Switch value={appLockEnabled} onValueChange={handleToggleAppLock} />
-          </View>
-        </View>
-      </View>
-      */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>CRM SYNC</Text>
-        {lastSyncError ? (
-          <View style={[styles.banner, { backgroundColor: colors.notification + '20', borderColor: colors.notification }]}>
-            <Text style={[styles.bannerText, { color: colors.notification }]}>
-              Last sync failed: {lastSyncError}
-            </Text>
-          </View>
-        ) : null}
+        <Text style={styles.sectionHeader}>CRM SYNC</Text>
+
+        {/* Warning Banner when recordings folder not set */}
         {!recordingsFolderUri ? (
-          <View style={[styles.banner, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}>
-            <Text style={[styles.bannerText, { color: colors.text }]}>
+          <View
+            style={[
+              styles.warningBanner,
+              {
+                backgroundColor: isDark ? '#2D171C' : '#FFF1F2',
+                borderColor: isDark ? '#4A1E26' : '#FFE4E6',
+              },
+            ]}
+          >
+            <AlertCircle size={18} color="#E11D48" style={styles.warningIcon} />
+            <Text
+              style={[
+                styles.warningText,
+                { color: isDark ? '#FCA5A5' : '#881337' },
+              ]}
+            >
               Call Recordings Folder isn't set yet — answered calls won't sync until you pick it below.
             </Text>
           </View>
         ) : null}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+        {/* Sync Error Banner if any */}
+        {lastSyncError ? (
+          <View
+            style={[
+              styles.warningBanner,
+              {
+                backgroundColor: isDark ? '#2D171C' : '#FFF1F2',
+                borderColor: isDark ? '#4A1E26' : '#FFE4E6',
+              },
+            ]}
+          >
+            <AlertCircle size={18} color="#E11D48" style={styles.warningIcon} />
+            <Text
+              style={[
+                styles.warningText,
+                { color: isDark ? '#FCA5A5' : '#881337' },
+              ]}
+            >
+              Last sync failed: {lastSyncError}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Salesperson Row */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <User color={colors.primary} size={20} />
-              <View>
-                <Text style={[styles.rowText, { color: colors.text }]}>
-                  {user ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Not logged in'}
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <User color="#A21E33" size={19} />
+              </View>
+              <View style={styles.rowTextContainer}>
+                <Text style={[styles.rowTitleBold, { color: colors.text }]}>
+                  {user ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Salesperson 1'}
                 </Text>
-                {currentOrg ? (
-                  <Text style={[styles.rowSubText, { color: colors.textMuted }]}>{currentOrg.name}</Text>
-                ) : null}
+                <Text style={[styles.rowSubtitle, { color: '#64748B' }]}>
+                  {currentOrg ? currentOrg.name : 'Demo Org'}
+                </Text>
               </View>
             </View>
+            <View style={styles.activeBadge}>
+              <Text style={styles.activeBadgeText}>Active</Text>
+            </View>
           </View>
-          <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border }]}>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Automatic Sync */}
+          <View style={styles.row}>
             <View style={[styles.rowLeft, { flex: 1, marginRight: 12 }]}>
-              <Clock color={colors.primary} size={20} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.rowText, { color: colors.text, marginLeft: 0 }]}>Automatic Sync</Text>
-                <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0 }]}>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Clock color="#A21E33" size={19} />
+              </View>
+              <View style={[styles.rowTextContainer, { flex: 1 }]}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Automatic Sync</Text>
+                <Text style={[styles.rowSubtitle, { color: '#64748B' }]}>
                   On app open and every 10 minutes while open
                 </Text>
               </View>
             </View>
-            <Switch value={autoSyncEnabled} onValueChange={setAutoSyncEnabled} />
+            <Switch
+              value={autoSyncEnabled}
+              onValueChange={setAutoSyncEnabled}
+              trackColor={{
+                false: isDark ? '#334155' : '#E2E8F0',
+                true: isDark ? '#4A1D27' : '#FCE7EB',
+              }}
+              thumbColor={autoSyncEnabled ? (isDark ? '#E05B71' : '#A21E33') : (isDark ? '#94A3B8' : '#FFFFFF')}
+              ios_backgroundColor={isDark ? '#334155' : '#E2E8F0'}
+            />
           </View>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Call Recordings Folder */}
           <TouchableOpacity
-            style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border, opacity: isSyncing ? 0.6 : 1 }]}
+            style={styles.row}
             onPress={handlePickRecordingsFolder}
-            disabled={isSyncing}
+            activeOpacity={0.7}
           >
-            <View style={[styles.rowLeft, { flex: 1, marginRight: 12 }]}>
-              <FolderOpen color={colors.primary} size={20} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.rowText, { color: colors.text, marginLeft: 0 }]}>Call Recordings Folder</Text>
-                <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0 }]} numberOfLines={1}>
-                  {recordingsFolderUri ? decodeURIComponent(recordingsFolderUri.split('/').pop() || 'Selected') : 'Not set — tap to select'}
-                </Text>
+            <View style={[styles.rowLeft, { flex: 1, marginRight: 8 }]}>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <FolderOpen color="#A21E33" size={19} />
               </View>
-            </View>
-          </TouchableOpacity>
-          <View style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border, alignItems: 'flex-start' }]}>
-            <View style={[styles.rowLeft, { flex: 1 }]}>
-              <CalendarClock color={colors.primary} size={20} style={{ marginTop: 6 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rowText, { color: colors.text }]}>Sync From Date</Text>
-                <Text style={[styles.rowSubText, { color: colors.textMuted, marginBottom: 8 }]}>
-                  {syncFromDate
-                    ? `Currently syncing from ${formatDateInput(syncFromDate)}`
-                    : 'Only sync calls on/after this date'}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.dateInput,
-                    { borderColor: colors.border, backgroundColor: colors.background, opacity: isSyncing ? 0.6 : 1 },
-                  ]}
-                  onPress={() => setShowDatePicker(true)}
-                  disabled={isSyncing}
-                >
-                  <Calendar color={colors.textMuted} size={16} />
-                  <Text style={{ color: syncFromDate ? colors.text : colors.textMuted, fontSize: 14, marginLeft: 8 }}>
-                    {syncFromDate ? formatDateInput(syncFromDate) : 'Select a date'}
-                  </Text>
-                </TouchableOpacity>
-                {showDatePicker ? (
-                  <DateTimePicker
-                    value={syncFromDate ? new Date(syncFromDate) : new Date()}
-                    mode="date"
-                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                    maximumDate={new Date()}
-                    onChange={handlePickSyncFromDate}
-                  />
-                ) : null}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.syncBtn, { backgroundColor: colors.primary, opacity: isSyncing ? 0.6 : 1 }]}
-                    onPress={handleSyncFromDate}
-                    disabled={isSyncing}
-                  >
-                    {isSyncing ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <RefreshCw color="#fff" size={14} />
-                    )}
-                    <Text style={styles.syncBtnText}>Sync</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.clearBtn,
-                      { borderColor: colors.border, opacity: syncFromDate && !isSyncing ? 1 : 0.5 },
-                    ]}
-                    onPress={handleClearSyncFromDate}
-                    disabled={!syncFromDate || isSyncing}
-                  >
-                    <X color={colors.text} size={14} />
-                    <Text style={[styles.clearBtnText, { color: colors.text }]}>Clear</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border }]}
-            onPress={handleSyncNow}
-            disabled={isSyncing}
-          >
-            <View style={styles.rowLeft}>
-              <RefreshCw color={colors.primary} size={20} />
-              <View>
-                <Text style={[styles.rowText, { color: colors.text }]}>Sync Call Logs Now</Text>
-                {lastSyncedAt ? (
-                  <Text style={[styles.rowSubText, { color: colors.textMuted }]}>
-                    Last synced {new Date(lastSyncedAt).toLocaleString()}
+              <View style={[styles.rowTextContainer, { flex: 1 }]}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Call Recordings Folder</Text>
+                {recordingsFolderUri ? (
+                  <Text style={[styles.rowSubtitle, { color: '#64748B' }]} numberOfLines={1}>
+                    {decodeURIComponent(recordingsFolderUri.split('/').pop() || 'Selected')}
                   </Text>
                 ) : (
-                  <Text style={[styles.rowSubText, { color: colors.textMuted }]}>Never synced</Text>
+                  <Text style={styles.notSetText}>Not set — tap to select</Text>
                 )}
               </View>
             </View>
-            {isSyncing ? <ActivityIndicator color={colors.primary} /> : null}
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Sync From Date */}
+          <View style={styles.syncDateBlock}>
+            <Text style={[styles.rowTitleBold, { color: colors.text }]}>Sync From Date</Text>
+            <Text style={[styles.rowSubtitle, { color: '#64748B', marginTop: 2, marginBottom: 12 }]}>
+              Only sync calls on/after this date
+            </Text>
+
+            <View style={styles.datePickerRow}>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Calendar color="#A21E33" size={19} />
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.dateInputBox,
+                  {
+                    borderColor: isDark ? '#4A1D27' : '#F4C2C9',
+                    backgroundColor: isDark ? '#261418' : '#FDF2F4',
+                  },
+                ]}
+                onPress={() => setShowDatePicker(true)}
+                disabled={isSyncing}
+                activeOpacity={0.7}
+              >
+                <Calendar size={16} color="#A21E33" style={{ marginRight: 8 }} />
+                <Text
+                  style={{
+                    color: syncFromDate ? colors.text : (isDark ? '#FCA5A5' : '#A21E33'),
+                    fontSize: 13,
+                    fontWeight: '500',
+                  }}
+                >
+                  {syncFromDate ? formatDateInput(syncFromDate) : 'Select a date'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showDatePicker ? (
+              <DateTimePicker
+                value={syncFromDate ? new Date(syncFromDate) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                maximumDate={new Date()}
+                onChange={handlePickSyncFromDate}
+              />
+            ) : null}
+
+            <View style={styles.dateButtonsRow}>
+              <TouchableOpacity
+                style={[styles.syncPillBtn, { opacity: isSyncing ? 0.7 : 1 }]}
+                onPress={handleSyncFromDate}
+                disabled={isSyncing}
+                activeOpacity={0.8}
+              >
+                {isSyncing ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <RefreshCw color="#fff" size={13} style={{ marginRight: 6 }} />
+                )}
+                <Text style={styles.syncPillText}>Sync</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.clearPillBtn,
+                  {
+                    backgroundColor: isDark ? '#261418' : '#FDF2F4',
+                    borderColor: isDark ? '#4A1D27' : '#F4C2C9',
+                    opacity: syncFromDate && !isSyncing ? 1 : 0.6,
+                  },
+                ]}
+                onPress={handleClearSyncFromDate}
+                disabled={!syncFromDate || isSyncing}
+                activeOpacity={0.8}
+              >
+                <X color="#A21E33" size={13} style={{ marginRight: 4 }} />
+                <Text style={[styles.clearPillText, { color: '#A21E33' }]}>
+                  Clear
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Sync Call Logs Now */}
           <TouchableOpacity
-            style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border }]}
-            onPress={handleLogout}
+            style={styles.row}
+            onPress={handleSyncNow}
+            disabled={isSyncing}
+            activeOpacity={0.7}
           >
             <View style={styles.rowLeft}>
-              <LogOut color={colors.notification} size={20} />
-              <Text style={[styles.rowText, { color: colors.notification }]}>Log Out</Text>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <RefreshCw color="#A21E33" size={19} />
+              </View>
+              <View style={styles.rowTextContainer}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Sync Call Logs Now</Text>
+                <Text style={[styles.rowSubtitle, { color: '#64748B' }]}>
+                  {lastSyncedAt
+                    ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}`
+                    : 'Never synced'}
+                </Text>
+              </View>
+            </View>
+            {isSyncing ? (
+              <ActivityIndicator color="#A21E33" size="small" />
+            ) : (
+              <ChevronRight size={18} color="#94A3B8" />
+            )}
+          </TouchableOpacity>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Log Out */}
+          <TouchableOpacity
+            style={styles.row}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <LogOut color="#A21E33" size={19} />
+              </View>
+              <Text style={styles.logoutText}>Log Out</Text>
             </View>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* 3. DATA & EXPORT */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>DATA & EXPORT</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity style={styles.row} onPress={handleExport}>
+        <Text style={styles.sectionHeader}>DATA & EXPORT</Text>
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          {/* Export Call History */}
+          <TouchableOpacity style={styles.row} onPress={handleExport} activeOpacity={0.7}>
             <View style={styles.rowLeft}>
-              <Download color={colors.primary} size={20} />
-              <Text style={[styles.rowText, { color: colors.text }]}>Export Call History</Text>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Download color="#A21E33" size={19} />
+              </View>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Export Call History</Text>
             </View>
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.row, { borderTopWidth: 1, borderTopColor: colors.border }]}>
+
+          <View style={[styles.divider, { backgroundColor: dividerColor }]} />
+
+          {/* Clear App Data */}
+          <TouchableOpacity style={styles.row} onPress={handleClearAppData} activeOpacity={0.7}>
             <View style={styles.rowLeft}>
-              <Trash2 color={colors.notification} size={20} />
-              <Text style={[styles.rowText, { color: colors.notification }]}>Clear App Data</Text>
+              <View style={[styles.iconBox, { backgroundColor: pinkBadgeBg }]}>
+                <Trash2 color="#E11D48" size={19} />
+              </View>
+              <Text style={styles.clearDataText}>Clear App Data</Text>
             </View>
+            <ChevronRight size={18} color="#E11D48" />
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* 4. APP INFO */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>APP INFO</Text>
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 20, alignItems: 'center' }]}>
+        <Text style={styles.sectionHeader}>APP INFO</Text>
+        <View
+          style={[
+            styles.card,
+            styles.appInfoCard,
+            { backgroundColor: cardBg, borderColor: cardBorder },
+          ]}
+        >
           <Image
-            source={require('../../assets/fam-logo-square.png')}
-            style={{ width: 64, height: 64, borderRadius: 12, marginBottom: 12 }}
+            source={require('../../assets/fam-logo.png')}
+            style={styles.appLogo}
             resizeMode="contain"
           />
-          <Text style={[styles.rowText, { color: colors.text, fontWeight: 'bold', fontSize: 18, marginLeft: 0 }]}>FamInfo Sales</Text>
-          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Version 1.0.0</Text>
-          <Text style={[styles.rowSubText, { color: colors.textMuted, marginLeft: 0, marginTop: 4 }]}>Developed by Hotcoders@2026</Text>
+          <Text style={[styles.appName, { color: colors.text }]}>FamInfo Sales</Text>
+          <Text style={styles.appVersion}>Version 1.0.0</Text>
+          <Text style={styles.appDeveloper}>Developed by Hotcoders@2026</Text>
         </View>
       </View>
-
     </ScrollView>
   );
 }
@@ -400,38 +557,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 110,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 22,
   },
-  banner: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    padding: 10,
-  },
-  bannerText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 20,
-    marginBottom: 8,
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8A94A6',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginLeft: 4,
+    textTransform: 'uppercase',
   },
   card: {
-    marginHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 1.5,
+      },
+    }),
   },
   row: {
     flexDirection: 'row',
@@ -444,50 +601,156 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  rowText: {
-    fontSize: 16,
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTextContainer: {
     marginLeft: 12,
   },
-  rowSubText: {
-    fontSize: 12,
+  rowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
     marginLeft: 12,
+  },
+  rowTitleBold: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  rowSubtitle: {
+    fontSize: 12,
     marginTop: 2,
   },
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  notSetText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E11D48',
+    marginTop: 2,
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#A21E33',
     marginLeft: 12,
-    borderWidth: 1,
-    borderRadius: 8,
+  },
+  clearDataText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#E11D48',
+    marginLeft: 12,
+  },
+  activeBadge: {
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  syncBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  activeBadgeText: {
+    color: '#16A34A',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  syncBtnText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
+  divider: {
+    height: 1,
+    width: '100%',
   },
-  clearBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 8,
+  warningBanner: {
+    borderRadius: 14,
     borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  warningIcon: {
+    marginTop: 1,
+    marginRight: 10,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  syncDateBlock: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  datePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateInputBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginLeft: 12,
+  },
+  dateButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    marginLeft: 52,
+  },
+  syncPillBtn: {
+    backgroundColor: '#8B1728',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  syncPillText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  clearPillBtn: {
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
+    borderRadius: 20,
   },
-  clearBtnText: {
+  clearPillText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  appInfoCard: {
+    paddingVertical: 26,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appLogo: {
+    width: 140,
+    height: 44,
+    marginBottom: 6,
+  },
+  appName: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  appVersion: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  appDeveloper: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 4,
   },
 });

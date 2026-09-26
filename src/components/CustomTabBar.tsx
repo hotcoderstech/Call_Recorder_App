@@ -116,9 +116,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: CustomT
     const isFocused = currentRouteName === tab.name;
     const IconComponent = tab.icon;
 
-    // Visual styles matching the reference image:
-    // Active item has bold dark black color, inactive has clean muted gray
-    const activeColor = isDark ? '#FFFFFF' : '#111827';
+    // Active item uses secondary brand color #A21E33, inactive has clean muted gray
+    const activeColor = isDark ? '#E05B71' : '#A21E33';
     const inactiveColor = isDark ? '#6B7280' : '#8E8E93';
 
     return (
@@ -276,12 +275,12 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#A21E33',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#8B5CF6',
+        shadowColor: '#A21E33',
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.45,
         shadowRadius: 12,

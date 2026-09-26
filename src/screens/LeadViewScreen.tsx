@@ -63,8 +63,8 @@ const STAGE_CODES: Record<string, string> = {
 const stageLabelFromCode = (code?: string | null) =>
   PIPELINE_STAGES.find((label) => STAGE_CODES[label] === code);
 
-const ACTIVE_STAGE = '#0891B2';
-const LIGHT_STAGE = '#A5DCE8';
+const ACTIVE_STAGE = '#A21E33';
+const LIGHT_STAGE = '#F4C2C9';
 
 export default function LeadViewScreen({ route, navigation }: Props) {
   const { leadId, lead: initialLead } = route.params;
@@ -297,11 +297,11 @@ export default function LeadViewScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: isDark ? '#111827' : '#F9FAFB' }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
       edges={['top', 'left', 'right']}
     >
       {/* Top Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
@@ -324,14 +324,14 @@ export default function LeadViewScreen({ route, navigation }: Props) {
       >
         {/* Phone & Top Action Pills */}
         <View style={styles.topActionSection}>
-          <Text style={[styles.phoneSubheader, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+          <Text style={[styles.phoneSubheader, { color: colors.textMuted }]}>
             {phoneNumber || 'No phone number'}
           </Text>
 
           <View style={styles.actionPillsContainer}>
             {/* Call Pill */}
             <TouchableOpacity
-              style={[styles.callPill, { backgroundColor: '#0891B2' }]}
+              style={[styles.callPill, { backgroundColor: colors.primary }]}
               onPress={handleCall}
               activeOpacity={0.85}
             >
@@ -435,7 +435,7 @@ export default function LeadViewScreen({ route, navigation }: Props) {
           {/* Call */}
           <View style={styles.quickActionCol}>
             <TouchableOpacity
-              style={[styles.quickActionButton, { backgroundColor: '#0891B2' }]}
+              style={[styles.quickActionButton, { backgroundColor: colors.primary }]}
               onPress={handleCall}
               activeOpacity={0.8}
             >
@@ -459,7 +459,7 @@ export default function LeadViewScreen({ route, navigation }: Props) {
           {/* Follow-up */}
           <View style={styles.quickActionCol}>
             <TouchableOpacity
-              style={[styles.quickActionButton, { backgroundColor: '#2563EB' }]}
+              style={[styles.quickActionButton, { backgroundColor: isDark ? '#BD2841' : '#8B1728' }]}
               onPress={() => setFollowUpModalVisible(true)}
               activeOpacity={0.8}
             >
@@ -491,8 +491,8 @@ export default function LeadViewScreen({ route, navigation }: Props) {
         <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Phone */}
           <TouchableOpacity style={styles.infoRow} onPress={handleCall} activeOpacity={0.7}>
-            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
-              <Phone color="#0891B2" size={18} />
+            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#2D171C' : '#FDF2F4' }]}>
+              <Phone color="#A21E33" size={18} />
             </View>
             <View style={styles.infoTextContainer}>
               <Text style={[styles.infoFieldLabel, { color: colors.textMuted }]}>Phone</Text>
@@ -510,8 +510,8 @@ export default function LeadViewScreen({ route, navigation }: Props) {
             onPress={() => email && Linking.openURL(`mailto:${email}`)}
             activeOpacity={0.7}
           >
-            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
-              <Mail color="#0891B2" size={18} />
+            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#2D171C' : '#FDF2F4' }]}>
+              <Mail color="#A21E33" size={18} />
             </View>
             <View style={styles.infoTextContainer}>
               <Text style={[styles.infoFieldLabel, { color: colors.textMuted }]}>Email</Text>
@@ -523,8 +523,8 @@ export default function LeadViewScreen({ route, navigation }: Props) {
 
           {/* Source */}
           <View style={styles.infoRow}>
-            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#1E293B' : '#E0F2FE' }]}>
-              <Tag color="#0891B2" size={18} />
+            <View style={[styles.infoIconBox, { backgroundColor: isDark ? '#2D171C' : '#FDF2F4' }]}>
+              <Tag color="#A21E33" size={18} />
             </View>
             <View style={styles.infoTextContainer}>
               <Text style={[styles.infoFieldLabel, { color: colors.textMuted }]}>Source</Text>
@@ -549,8 +549,8 @@ export default function LeadViewScreen({ route, navigation }: Props) {
                 key={act.id}
                 style={[styles.activityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               >
-                <View style={[styles.activityBadge, { backgroundColor: '#E0F2FE' }]}>
-                  <Tag color="#0891B2" size={16} />
+                <View style={[styles.activityBadge, { backgroundColor: isDark ? '#2D171C' : '#FDF2F4' }]}>
+                  <Tag color="#A21E33" size={16} />
                 </View>
                 <View style={styles.activityTextContainer}>
                   <Text style={[styles.activityTitle, { color: colors.text }]}>{act.title}</Text>
@@ -571,8 +571,8 @@ export default function LeadViewScreen({ route, navigation }: Props) {
             <View
               style={[styles.activityCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
-              <View style={[styles.activityBadge, { backgroundColor: '#E0F2FE' }]}>
-                <Tag color="#0891B2" size={16} />
+              <View style={[styles.activityBadge, { backgroundColor: isDark ? '#2D171C' : '#FDF2F4' }]}>
+                <Tag color="#A21E33" size={16} />
               </View>
               <View style={styles.activityTextContainer}>
                 <Text style={[styles.activityTitle, { color: colors.text }]}>Lead reassigned</Text>
@@ -692,7 +692,7 @@ export default function LeadViewScreen({ route, navigation }: Props) {
                 <Text style={{ color: colors.text }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonSubmit, { backgroundColor: '#F59E0B' }]}
+                style={[styles.modalButtonSubmit, { backgroundColor: colors.primary }]}
                 onPress={handleSaveNote}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Save Note</Text>
@@ -736,7 +736,7 @@ export default function LeadViewScreen({ route, navigation }: Props) {
                   style={[
                     styles.dayChip,
                     { borderColor: colors.border },
-                    followUpDays === days && { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+                    followUpDays === days && { backgroundColor: colors.primary, borderColor: colors.primary },
                   ]}
                   onPress={() => setFollowUpDays(days)}
                 >
@@ -760,7 +760,7 @@ export default function LeadViewScreen({ route, navigation }: Props) {
                 <Text style={{ color: colors.text }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButtonSubmit, { backgroundColor: '#2563EB' }]}
+                style={[styles.modalButtonSubmit, { backgroundColor: colors.primary }]}
                 onPress={handleSaveFollowUp}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: 'bold' }}>Schedule</Text>
@@ -824,7 +824,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 48,
     borderRadius: 14,
-    shadowColor: '#0891B2',
+    shadowColor: '#A21E33',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,

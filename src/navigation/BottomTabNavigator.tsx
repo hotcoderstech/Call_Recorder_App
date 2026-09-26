@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, useColorScheme, TouchableOpacity } from 'react-native';
+import { View, Text, useColorScheme, TouchableOpacity, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Settings } from 'lucide-react-native';
 import HomeScreen from '../screens/HomeScreen';
@@ -25,9 +25,16 @@ export default function BottomTabNavigator() {
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
         headerLeft: () => (
-          <Text style={{ marginLeft: 16, fontSize: 18, fontWeight: 'bold', color: colors.text }}>
-            {route.name === 'Home' ? 'FamInfo Sales' : route.name}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 16 }}>
+            <Image
+              source={require('../../assets/Birds.png')}
+              style={{ width: 28, height: 28, marginRight: 8 }}
+              resizeMode="contain"
+            />
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text }}>
+              {route.name === 'Home' ? 'FamInfo Sales' : route.name}
+            </Text>
+          </View>
         ),
         headerTitle: () => null,
         headerStyle: {

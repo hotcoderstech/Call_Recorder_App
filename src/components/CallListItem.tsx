@@ -25,7 +25,8 @@ const CALL_TYPE = {
 
 function AudioPlaybackButton({ url, colors }: { url: string; colors: any }) {
   const player = useAudioPlayer(url);
-  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const status: any = (useEvent as any)(player, 'playbackStatusUpdate', { isPlaying: player.playing });
+  const isPlaying = status?.isPlaying ?? player.playing;
 
   const togglePlayback = () => {
     if (isPlaying) {

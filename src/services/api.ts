@@ -157,6 +157,16 @@ export const leadsApi = {
     return data.data;
   },
 
+  async getAllMyLeads(): Promise<LeadSummary[]> {
+    try {
+      const { data } = await apiClient.get('/leads', { params: { limit: 100 } });
+      return data.data || [];
+    } catch (e) {
+      console.warn('Failed to load user leads:', e);
+      return [];
+    }
+  },
+
   async getById(leadId: string): Promise<LeadDetails> {
     const { data } = await apiClient.get(`/leads/${leadId}`);
     return data.data;
@@ -255,5 +265,15 @@ export const callsApi = {
   async lookupRecordings(calls: { phoneNumber: string; timestamp: number }[]): Promise<RecordingMatch[]> {
     const { data } = await apiClient.post('/calls/lookup-recordings', { calls });
     return data.data;
+  },
+
+  async getCalls(params?: { page?: number; limit?: number; leadId?: string }): Promise<any[]> {
+    try {
+      const { data } = await apiClient.get('/calls', { params: { limit: 100, ...params } });
+      return data.data || [];
+    } catch (e) {
+      console.warn('Failed to load server calls:', e);
+      return [];
+    }
   },
 };

@@ -201,8 +201,8 @@ export default function HomeScreen() {
         style={[
           styles.dateCard,
           {
-            backgroundColor: isDark ? '#1F2937' : '#EFF6FF',
-            borderColor: isDark ? '#374151' : '#DBEAFE',
+            backgroundColor: colors.card,
+            borderColor: colors.border,
           },
         ]}
       >
@@ -210,7 +210,7 @@ export default function HomeScreen() {
           <Text
             style={[
               styles.dateDayText,
-              { color: isDark ? '#60A5FA' : '#2563EB' },
+              { color: isDark ? '#E05B71' : '#A21E33' },
             ]}
           >
             {format(new Date(), 'EEEE')}
@@ -222,10 +222,10 @@ export default function HomeScreen() {
         <View
           style={[
             styles.dateIconWrapper,
-            { backgroundColor: isDark ? '#374151' : '#DBEAFE' },
+            { backgroundColor: isDark ? '#2A171A' : '#FDF2F4' },
           ]}
         >
-          <Calendar size={22} color={isDark ? '#60A5FA' : '#2563EB'} />
+          <Calendar size={22} color={isDark ? '#E05B71' : '#A21E33'} />
         </View>
       </View>
 
